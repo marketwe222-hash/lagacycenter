@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/useToast";
+import { PLANS, formatPrice } from "@/lib/plans";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,23 @@ function LogoCheckIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+function ArrowLeftIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      {...props}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19 12H5M12 19l-7-7 7-7"
+      />
+    </svg>
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -150,6 +168,29 @@ function Field({
   );
 }
 
+function BackButton() {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        // Use real browser history when there is somewhere to go back to,
+        // otherwise fall back to the plans page so the button always does
+        // something sensible (e.g. direct link / new tab to /register).
+        if (typeof window !== "undefined" && window.history.length > 1) {
+          router.back();
+        } else {
+          router.push("/courses");
+        }
+      }}
+      className="inline-flex items-center gap-1.5 text-[13px] font-medium text-white/50 transition-colors hover:text-white"
+    >
+      <ArrowLeftIcon className="h-4 w-4" />
+      Back
+    </button>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface FormState {
@@ -160,10 +201,16 @@ interface FormState {
   agree: boolean;
 }
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const plan = params.get("plan"); // from /courses CTA, e.g. "pro"
+
+  // Course/plan is driven by ?plan=<slug>, e.g. coming from the CTA on /courses.
+  // If it's missing or doesn't match anything, default to the first plan
+  // (Starter) so every registration is always associated with a course.
+  const planSlug = params.get("plan");
+  const selectedPlan = PLANS.find((p) => p.slug === planSlug) ?? PLANS[0];
+
   const { addToast } = useToast();
 
   const [form, setForm] = useState<FormState>({
@@ -204,7 +251,8 @@ export default function RegisterPage() {
     if (!validate()) return;
     setLoading(true);
     try {
-      // TODO: replace with real register (e.g. await register({ ...form, plan }))
+      // TODO: replace with real register call, e.g.
+      // await register({ ...form, plan: selectedPlan.slug })
       await new Promise((r) => setTimeout(r, 900));
       addToast(
         "Account created! Welcome to Legacy Language Center.",
@@ -254,29 +302,54 @@ export default function RegisterPage() {
       {/* Form side */}
       <div className="order-1 flex items-center justify-center bg-[#04040f] px-6 py-12 lg:order-2">
         <div className="w-full max-w-[380px]">
-          <NextLink
-            href="/"
-            className="mb-8 inline-flex items-center gap-2.5 lg:hidden"
-          >
-            <LogoCheckIcon className="h-8 w-8 text-[#A11D2C]" />
-            <span className="text-[15px] font-bold text-white">
-              Legacy Language Center
-            </span>
-          </NextLink>
+          <div className="mb-7 flex items-center justify-between">
+            <NextLink
+              href="/"
+              className="inline-flex items-center gap-2.5 lg:hidden"
+            >
+              <LogoCheckIcon className="h-8 w-8 text-[#A11D2C]" />
+              <span className="text-[15px] font-bold text-white">
+                Legacy Language Center
+              </span>
+            </NextLink>
+            <BackButton />
+          </div>
 
           <h1 className="text-[28px] font-extrabold text-white">
             Create account
           </h1>
           <p className="mt-1.5 text-[13.5px] text-white/50">
-            {plan
-              ? `You're signing up for the ${plan} plan.`
-              : "It only takes a minute to get started."}
+            It only takes a minute to get started.
           </p>
+
+          {/* Selected plan summary — always shows a course, defaults to Starter */}
+          <div className="mt-5 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#1A0E10]/60 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/40">
+                Selected plan
+              </p>
+              <p className="truncate text-[14px] font-bold text-white">
+                {selectedPlan.name}{" "}
+                <span className="font-medium text-white/50">
+                  ·{" "}
+                  {selectedPlan.price === 0
+                    ? "Free"
+                    : `${formatPrice(selectedPlan.price)} CFA/mo`}
+                </span>
+              </p>
+            </div>
+            <NextLink
+              href="/courses"
+              className="shrink-0 text-[12.5px] font-semibold text-[#e05565] hover:underline"
+            >
+              Change
+            </NextLink>
+          </div>
 
           <form
             onSubmit={handleSubmit}
             noValidate
-            className="mt-8 flex flex-col gap-4"
+            className="mt-6 flex flex-col gap-4"
           >
             <Field
               icon={<UserIcon className="h-4.5 w-4.5" />}
@@ -411,5 +484,13 @@ export default function RegisterPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
   );
 }
