@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import NextLink from "next/link";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
-
+import Image from "next/image";
 const NAV_LINKS = [
   { label: "Home", href: "/" },
   { label: "Courses", href: "/courses" },
@@ -28,7 +28,6 @@ function LogoCheckIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
 function SunIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -46,7 +45,6 @@ function SunIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
 function MoonIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -54,7 +52,6 @@ function MoonIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
 function MenuIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -68,7 +65,6 @@ function MenuIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
 function CloseIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -82,7 +78,6 @@ function CloseIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
 function DashboardIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -99,7 +94,6 @@ function DashboardIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
 function UserIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -114,7 +108,6 @@ function UserIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
 function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -132,7 +125,6 @@ function SettingsIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
 function LogoutIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -150,7 +142,6 @@ function LogoutIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
 function MapPinIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -169,7 +160,6 @@ function MapPinIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
 function PhoneIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -197,13 +187,40 @@ export default function Navbar() {
   const [lang, setLang] = useState<"en" | "fr">("en");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  // ── Hide-on-scroll-down / show-on-scroll-up logic ──
+  // We track the full header (top-bar + navbar) as one unit.
+  // - At top of page (scrollY < 10): fully visible, transparent bg
+  // - Scrolling down: slides up and hides (translateY(-100%))
+  // - Scrolling up: slides back down with solid crimson bg
+  const [visible, setVisible] = useState(true);
+  const [atTop, setAtTop] = useState(true);
+  const lastScrollY = useRef(0);
 
-  // Detect scroll to add background to navbar when over hero
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
+    const onScroll = () => {
+      const y = window.scrollY;
+      const isAtTop = y < 10;
+      const scrollingDown = y > lastScrollY.current;
+
+      setAtTop(isAtTop);
+
+      if (isAtTop) {
+        // Always show at top
+        setVisible(true);
+      } else if (scrollingDown && y > 80) {
+        // Hide when scrolling down (after 80px threshold)
+        setVisible(false);
+        // Also close mobile menu
+        setIsMenuOpen(false);
+      } else if (!scrollingDown) {
+        // Show when scrolling up
+        setVisible(true);
+      }
+
+      lastScrollY.current = y;
+    };
+
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -217,6 +234,7 @@ export default function Navbar() {
   }, [isMenuOpen]);
 
   // Close dropdown on outside click
+  const dropdownRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (
@@ -235,10 +253,20 @@ export default function Navbar() {
     ...(user ? [{ label: "Dashboard", href: "/dashboard" }] : []),
   ];
 
+  // Total header height: top-bar ~30px + navbar ~64px = ~94px
+  // We translate the whole header upward to hide it
+  const headerTranslate = visible ? "translate-y-0" : "-translate-y-full";
+
   return (
-    <header className="w-full">
+    <header
+      className={[
+        // Fixed at top-0 so the whole header (bar + nav) slides as one unit
+        "fixed top-0 left-0 right-0 z-40 w-full",
+        "transition-transform duration-300 ease-in-out",
+        headerTranslate,
+      ].join(" ")}
+    >
       {/* ── Top contact bar ── */}
-      {/* Always dark crimson — sits above the hero */}
       <div className="w-full bg-[#1A0E10] text-[#c8a8a8]">
         <div className="mx-auto flex max-w-(--breakpoint-xl) items-center justify-between px-4 py-1.5 sm:px-6">
           <div className="flex items-center gap-5 text-[11.5px]">
@@ -251,8 +279,6 @@ export default function Navbar() {
               +237 671 619 643 · 680 148 076
             </span>
           </div>
-
-          {/* EN / FR toggle */}
           <div
             className="flex overflow-hidden rounded-full bg-white/10 text-[11px] font-semibold"
             role="group"
@@ -276,33 +302,25 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* ── Main navbar — floats over hero ── */}
-      {/*
-        position: absolute on hero-page, fixed after scroll.
-        We achieve "float over hero" by making the nav absolute/fixed
-        and letting the hero section be full-height behind it.
-        The public layout should NOT add padding-top — the hero handles its own padding.
-      */}
+      {/* ── Main navbar ── */}
       <nav
         className={[
-          "fixed top-[30px] left-0 right-0 z-40 w-full transition-all duration-300",
-          scrolled
-            ? "bg-[#1A0E10]/95 backdrop-blur-md border-b border-white/10 shadow-lg shadow-black/30"
-            : "bg-transparent",
+          "w-full transition-colors duration-300",
+          // Transparent when floating over hero at top; solid when scrolled back up mid-page
+          atTop
+            ? "bg-transparent"
+            : "bg-[#1A0E10]/95 backdrop-blur-md border-b border-white/10 shadow-lg shadow-black/30",
         ].join(" ")}
       >
-        <div className="relative mx-auto flex max-w-(--breakpoint-xl) items-center justify-between px-4 py-3.5 sm:px-6">
+        <div className="relative mx-auto flex max-w-(--breakpoint-xl) items-center justify-between px-4 py-0 sm:px-6">
           {/* Logo */}
-          <NextLink href="/" className="flex items-center gap-2.5 shrink-0">
-            <LogoCheckIcon className="h-9 w-9 text-[#A11D2C]" />
-            <div className="flex flex-col leading-none">
-              <span className="text-[15px] font-extrabold tracking-[0.08em] text-white">
-                LEGACY
-              </span>
-              <span className="mt-0.5 text-[9px] font-bold tracking-[0.2em] text-[#e05565]">
-                LANGUAGE CENTER
-              </span>
-            </div>
+          <NextLink href="/" className=" shrink-0">
+            <Image
+              src="/icons/logo.png"
+              alt="Legacy Language Center"
+              width={100}
+              height={120}
+            />
           </NextLink>
 
           {/* Nav links — absolute center */}
@@ -320,7 +338,6 @@ export default function Navbar() {
 
           {/* Right actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Theme toggle */}
             <button
               onClick={toggleTheme}
               aria-label="Toggle theme"
@@ -333,7 +350,6 @@ export default function Navbar() {
               )}
             </button>
 
-            {/* Authenticated: avatar + dropdown */}
             {user ? (
               <div className="relative" ref={dropdownRef}>
                 <button
@@ -344,7 +360,6 @@ export default function Navbar() {
                 >
                   {(user.name ?? "U").charAt(0).toUpperCase()}
                 </button>
-
                 {isDropdownOpen && (
                   <div className="absolute right-0 top-[calc(100%+10px)] z-50 min-w-[210px] overflow-hidden rounded-xl border border-white/15 bg-[#1A0E10] shadow-xl shadow-black/40">
                     <div className="border-b border-white/10 px-4 py-3">
@@ -410,7 +425,6 @@ export default function Navbar() {
               </>
             )}
 
-            {/* Mobile menu button */}
             <button
               onClick={() => setIsMenuOpen((o) => !o)}
               aria-label={isMenuOpen ? "Close menu" : "Open menu"}
